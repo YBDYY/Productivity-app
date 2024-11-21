@@ -3,10 +3,15 @@
 #include <chrono>
 #include <thread>
 #include <fstream>
-#include <sstream>  
+#include <sstream>
+#include <atomic>
+#include <termios.h>
+#include <unistd.h>  
 
 
 using namespace std;
+
+atomic<bool> stopTimer(false);
 
 
 struct Task{
@@ -33,6 +38,141 @@ void displayASCIIart(){
 void Pause(){
   this_thread::sleep_for(chrono::seconds(2));
 }
+// Function to configure terminal to allow immediate keypress detection
+void setInputMode() {
+    struct termios t;
+    tcgetattr(STDIN_FILENO, &t);           
+    t.c_lflag &= ~(ICANON | ECHO);         
+    t.c_cc[VMIN] = 1;                      
+    t.c_cc[VTIME] = 0;                     //time out in tenths of seconds..
+    tcsetattr(STDIN_FILENO, TCSANOW, &t);  
+}
+// Function to restore terminal settings
+void resetInputMode() {
+    struct termios t;
+    tcgetattr(STDIN_FILENO, &t);
+    t.c_lflag |= (ICANON | ECHO);          // Enable canonical mode and echo back
+    tcsetattr(STDIN_FILENO, TCSANOW, &t);  // Apply the changes
+}
+// Function to read a single character from the user without needing Enter key
+char getChar() {
+    char ch;
+    read(STDIN_FILENO, &ch, 1);
+    return ch;
+}
+
+
+
+
+
+void StartPomodoroTimer(){
+  int WorkTime, BreakTime;
+
+  //choices for worktime...
+  cout << "Choose work time: " << endl;
+  cout << "1. 25 minutes " << endl;
+  cout << "2. 50 minutes " << endl;
+  cout << "3. 90 minutes " << endl;
+  cout << "4. custom time(set your own)" << endl;
+  int choice;
+  cin >> choice;
+
+  switch (choice){
+    case 1:
+      WorkTime = 25;
+      break;
+    case 2: 
+      WorkTime = 50;
+      break;
+    case 3: 
+      WorkTime = 90;
+      break;
+    case 4:
+      cout << "Enter custom work time in minutes: " << endl;
+      cin >> WorkTime;
+      break;
+    default: 
+      cout <<"Invalid choice, using default 25 minutes." << endl;
+      WorkTime = 25;
+  }
+
+  //choices for breaktime...
+  cout << "Choose break time:" << endl;
+  cout << "1. 5 minutes" << endl;
+  cout << "2. 10 minutes" << endl;
+  cout << "3. 15 minutes" << endl;
+  cout << "4. Custom break time (set your own)" << endl;
+  cin >> choice;
+
+  switch(choice){
+    case 1:
+      BreakTime = 5;
+      break;
+    case 2: 
+      BreakTime = 10;
+      break;
+    case 3:
+      BreakTime = 15;
+      break;
+    case 4:
+      cout << "Enter custom break time in minutes: " << endl;
+      cin >> BreakTime;
+      break;
+    default:
+    cout <<"Invalid choice, using default 5 minutes." << endl;
+    BreakTime = 5;
+  }
+
+  // Start work session
+  cout << "Pomodoro started! Work for " << WorkTime << " minutes." << endl;
+  stopTimer = false;  // Reset the stop flag
+
+  // Start work timer thread
+  thread timerThread([WorkTime]() {
+      for (int i = WorkTime * 60; i > 0; --i) {
+          if (stopTimer) {
+              cout << "\nPomodoro session stopped early!" << endl;
+              return;  // Stop the timer early
+          }
+          this_thread::sleep_for(chrono::seconds(1));
+      }
+      cout << "Work session over! Take a break." << endl;
+  });
+
+  setInputMode();
+
+  char UserInput;
+  while (timerThread.joinable()){
+    UserInput = getchar();
+    if(UserInput == 'q' || UserInput == 'Q'){
+      stopTimer = true;
+      timerThread.join();
+      break;
+    }
+  }
+
+  resetInputMode();
+
+  // Start break session only if the work session was not stopped early
+  if (!stopTimer) {
+    cout << "Break time. Take a rest for " << BreakTime << " minutes." << endl;
+    for (int i = BreakTime * 60; i > 0; --i) {
+      if (stopTimer) {
+        cout << "\nBreak session stopped early." << endl;
+        return;  // Stop the break session early
+      }
+      this_thread::sleep_for(chrono::seconds(1));
+    }
+    cout << "Break over. Ready for the next session." << endl;
+  }
+}
+
+
+
+
+
+
+
 
 void SaveTask(const vector<Task>& tasks){
   ofstream outfile("tasks.txt");
@@ -164,6 +304,7 @@ int main(){
     cout << "3. Display Tasks"<< endl;
     cout << "4. Toggle Task Status"<< endl;
     cout << "5. Exit" << endl; 
+    cout << "6. Start Pomodoro Timer"<<endl;
     cout << "Enter your choice: "<<endl;
     cin >> choice;
 
@@ -183,11 +324,13 @@ int main(){
     case 5:
       cout << "Exiting program..." << endl;
       break;
+    case  6:
+      StartPomodoroTimer();
     default: 
       cout << "Invalid choice. Please try again." << endl;  
 
     }
    }while (choice!=5); 
 
-  return 0;
+  return 0; 
 }
