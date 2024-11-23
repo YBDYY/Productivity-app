@@ -1,6 +1,6 @@
 # To-Do List
 
-A simple to-do list manager with an integrated Pomodoro timer to boost productivity.
+A simple productivity app  with an integrated Pomodoro timer, and a to do list to boost productivity.
 
 ## Features
 - Add, remove, and display tasks
