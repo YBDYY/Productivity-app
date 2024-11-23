@@ -6,9 +6,12 @@
 #include <sstream>
 #include <atomic>
 #include <termios.h>
-#include <unistd.h>  
+#include <unistd.h>
+#include "nlohmann/json.hpp"
+#include <curl/curl.h>
 
 
+using json = nlohmann::json;
 using namespace std;
 
 atomic<bool> stopTimer(false);
